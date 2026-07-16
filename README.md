@@ -18,40 +18,57 @@
 
 ## 安装
 
-需要 Python 3.9+（推荐 3.11）。音色迁移为计算密集型，强烈建议有 NVIDIA CUDA GPU 或 Apple Silicon (MPS)。
+需要 Python 3.11（音色迁移为计算密集型，强烈建议有 NVIDIA CUDA GPU 或 Apple Silicon MPS）。
 
-本工程使用独立的虚拟环境（`.venv`）：
+> **关于被忽略的文件**：`.venv`、`models/rvc`（RVC 仓库 clone + 其依赖 + 预训练模型）、所有 `.pth/.pt` 大模型文件都被 `.gitignore` 忽略，不纳入仓库。新克隆后运行 `setup.sh` 即可自动获取全部内容。
+
+### 方式一：一键初始化（推荐，新克隆必用）
 
 ```bash
-# 创建虚拟环境（Python 3.11）
-python3.11 -m venv .venv
-
-# 基础安装（CLI 框架 + 音频工具）
-.venv/bin/pip install -e .
-
-# 安装源分离依赖（Demucs）
-.venv/bin/pip install torch torchaudio demucs faiss-cpu
-
-# 安装音色建模依赖（ContentVec 特征）
-.venv/bin/pip install transformers
-
-# 开发工具
-.venv/bin/pip install -e ".[dev]"
+git clone https://github.com/ArlexDu/MusicRemix.git
+cd MusicRemix
+bash setup.sh
 ```
 
-> 国内网络可加镜像源加速：`-i https://pypi.tuna.tsinghua.edu.cn/simple`
+`setup.sh` 会自动完成（幂等，可重复运行）：
+1. 创建主工程虚拟环境 `.venv`，安装 torch/demucs/faiss/transformers 等依赖
+2. clone RVC 官方仓库到 `models/rvc`
+3. 创建 RVC 独立虚拟环境 `models/rvc/venv`，安装 fairseq/RVC 依赖、ffmpeg
+4. 下载预训练模型（hubert_base.pt、rmvpe.pt、f0G48k.pth，约 400MB）
+5. 构造可推理的 `base_v2_48k.pth` 并 patch RVC 兼容 torch≥2.6
 
-## RVC 环境准备（音色迁移必需）
+> 国内网络已默认使用清华 PyPI 镜像加速。fairseq 需源码编译，耗时数分钟。
 
-音色迁移这一步调用外部 RVC 推理环境（依赖解耦，使用官方 RVC 最可靠）。PyPI 上的 `rvc-python` 包已废弃不可用，因此本工程在 `models/rvc/` 内置了 RVC 官方仓库的 clone，并已完成初始化：
+完成后验证：
+```bash
+.venv/bin/musicremix info   # 应显示：内嵌依赖全 ✓，外部RVC环境 infer_cli ✓, 2个模型
+```
 
-- ✅ 依赖已装（fairseq、torch、faiss、praat-parselmouth、torchcrepe、torchfcpe、ffmpeg 等）
-- ✅ 预训练模型已下载（hubert_base.pt、rmvpe.pt、pretrained_v2/f0G48k.pth）
-- ✅ `base_v2_48k.pth` 已构造为可推理模型（放于 `assets/weights/`，用于流程验证）
+### 方式二：手动安装（自定义场景）
 
 ```bash
-# 验证 RVC 环境就绪（应显示 infer_cli ✓, 2个模型）
-musicremix info
+# 主工程虚拟环境
+python3.11 -m venv .venv
+.venv/bin/pip install -e ".[dev]"
+.venv/bin/pip install torch torchaudio demucs faiss-cpu transformers "numpy<2"
+
+# RVC 环境
+git clone --depth 1 https://github.com/RVC-Project/Retrieval-based-Voice-Conversion-WebUI models/rvc
+cd models/rvc
+python3.11 -m venv venv
+# 详见 setup.sh 中 RVC 部分，或运行 bash setup.sh 仅补全 RVC
+```
+
+## RVC 环境说明（音色迁移必需）
+
+音色迁移调用外部 RVC 推理环境（`models/rvc/`，由 `setup.sh` 自动准备）。环境就绪后包含：
+- RVC 依赖（fairseq、torch、faiss、praat-parselmouth、torchcrepe、ffmpeg 等）
+- 预训练模型（hubert_base.pt、rmvpe.pt、f0G48k.pth）
+- `base_v2_48k.pth` 可推理模型（放于 `assets/weights/`，用于流程验证）
+
+```bash
+# 验证 RVC 环境就绪
+musicremix info   # 应显示 infer_cli ✓, 2个模型
 
 # 用 base 模型验证推理链路（音色为中性 base，非特定歌手）
 musicremix convert --vocal vocals.wav --model-name base_v2_48k.pth --output out.wav
@@ -59,17 +76,13 @@ musicremix convert --vocal vocals.wav --model-name base_v2_48k.pth --output out.
 
 ### 关于音色模型（重要）
 
-RVC 推理需要一个**训练完成的生成器模型**（含 config/weight 结构，放于 `assets/weights/`）。`base_v2_48k.pth` 是通用基础模型，可用于验证流程，但音色中性、不特定于任何歌手。
-
-要真正换某歌手 B 的音色，需用 RVC 训练流程基于该歌手的参考人声训练一个模型：
+RVC 推理需要一个**训练完成的生成器模型**（含 config/weight 结构，放于 `assets/weights/`）。`base_v2_48k.pth` 是通用基础模型，可验证流程，但音色中性。要真正换某歌手 B 的音色，需用 RVC 训练流程基于该歌手参考人声训练模型：
 
 ```bash
-cd models/rvc
-source venv/bin/activate
-# 1. 准备目标歌手干净人声（可用本工程的 musicremix separate 分离）
-# 2. 按 RVC WebUI 训练流程：preprocess（hubert提特征）→ extract_f0 → train
-# 3. 训练产出的 .pth 自动放于 assets/weights/
-# 详见 models/rvc/README.md 的训练章节
+cd models/rvc && source venv/bin/activate
+# 1. 准备目标歌手干净人声（可用 musicremix separate 分离）
+# 2. 按 RVC WebUI 训练流程：preprocess → extract_f0 → train
+# 3. 训练产出的 .pth 自动放于 assets/weights/，即可用于 convert/remix
 ```
 
 如需指向其他位置的 RVC，用环境变量覆盖：
