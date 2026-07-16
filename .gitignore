@@ -1,0 +1,43 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+build/
+dist/
+.eggs/
+*.egg
+
+# Virtual envs
+.venv/
+venv/
+env/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+.DS_Store
+
+# Test / coverage
+.pytest_cache/
+.coverage
+htmlcov/
+.ruff_cache/
+
+# Model cache & runtime artifacts (do not commit large binaries)
+~/.musicremix/
+# 外部模型引擎目录：保留 README，忽略 clone 的仓库与大权重
+models/*/
+!models/README.md
+*.pth
+*.index
+*.pt
+*.ckpt
+
+# Working / output dirs
+output/
+workdir/
+*.wav
+*.mp3
+*.flac
+!tests/data/*.wav

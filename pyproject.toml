@@ -1,0 +1,71 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "musicremix"
+version = "0.1.0"
+description = "歌曲换音色工具：保留原曲旋律与伴奏，替换演唱者音色"
+readme = "README.md"
+requires-python = ">=3.9"
+license = { text = "MIT" }
+authors = [{ name = "MusicRemix" }]
+keywords = ["voice-conversion", "rvc", "music", "timbre-transfer", "demucs"]
+
+dependencies = [
+    # numpy<2：faiss-cpu 在 numpy 2.x 下存在 ABI 冲突
+    "numpy>=1.24,<2",
+    "soundfile>=0.12",
+    "librosa>=0.10",
+    "pydub>=0.25",
+    "typer>=0.12",
+    "rich>=13.0",
+    "tqdm>=4.65",
+    "pyyaml>=6.0",
+    "fastapi>=0.100",
+    "uvicorn[standard]>=0.20",
+    "python-multipart>=0.0.6",
+]
+
+[project.optional-dependencies]
+# 源分离 + 音色迁移所需的重量级依赖（按需安装）
+ml = [
+    "torch>=2.1",
+    "torchaudio>=2.1",
+    "demucs>=4.0.1",
+    "faiss-cpu>=1.7",
+]
+# RVC 音色迁移后端（检索式）
+rvc = [
+    "torch>=2.1",
+    "torchaudio>=2.1",
+    "faiss-cpu>=1.7",
+    "transformers>=4.30",
+    # RVC 推理封装（PyPI 版本较低；若不可用，见 README 手动集成说明）
+    "rvc-python>=0.1.0",
+]
+dev = [
+    "pytest>=7.0",
+    "pytest-cov>=4.0",
+    "ruff>=0.4",
+]
+
+[project.scripts]
+musicremix = "musicremix.cli:app"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py39"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "W", "UP"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q -m 'not slow'"
+markers = [
+    "slow: 需要重模型(Demucs/torch/faiss)的集成测试，默认跳过；手动跑用 -m slow",
+]
