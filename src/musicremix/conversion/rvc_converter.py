@@ -31,6 +31,17 @@ logger = logging.getLogger(__name__)
 _INFER_CLI_CANDIDATES = ("tools/infer_cli.py", "infer_cli.py", "src/infer_cli.py")
 
 
+def _venv_subdir() -> str:
+    """虚拟环境的可执行目录：Windows 为 Scripts，Unix 为 bin。"""
+    return "Scripts" if os.name == "nt" else "bin"
+
+
+def _venv_python(rvc_home: Path) -> Path:
+    """RVC 虚拟环境的 python 可执行文件路径（跨平台）。"""
+    exe = "python.exe" if os.name == "nt" else "python"
+    return rvc_home / "venv" / _venv_subdir() / exe
+
+
 def _rvc_device_str(dev: Device) -> str:
     """把本工具的设备枚举映射为 RVC 能理解的字符串。
 
@@ -63,7 +74,7 @@ class ExternalRVCConverter(VoiceConverter):
             rvc_home if rvc_home else os.environ.get("MUSICREMIX_RVC_HOME", self.config.rvc_home)
         ).resolve()
         self.python_bin = python_bin or os.environ.get(
-            "MUSICREMIX_RVC_PYTHON", str(self.rvc_home / "venv" / "bin" / "python")
+            "MUSICREMIX_RVC_PYTHON", str(_venv_python(self.rvc_home))
         )
 
     def _resolve_infer_cli(self) -> Path:
@@ -129,9 +140,9 @@ class ExternalRVCConverter(VoiceConverter):
         )
         logger.debug("RVC 命令: %s", " ".join(cmd))
 
-        # 确保 ffmpeg（软链接在 venv/bin）在 PATH 中
+        # 确保 ffmpeg（位于 venv 可执行目录）在 PATH 中
         env = dict(os.environ)
-        venv_bin = str(self.rvc_home / "venv" / "bin")
+        venv_bin = str(self.rvc_home / "venv" / _venv_subdir())
         env["PATH"] = venv_bin + os.pathsep + env.get("PATH", "")
 
         proc = subprocess.run(

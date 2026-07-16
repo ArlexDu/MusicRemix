@@ -18,19 +18,27 @@
 
 ## 安装
 
-需要 Python 3.11（音色迁移为计算密集型，强烈建议有 NVIDIA CUDA GPU 或 Apple Silicon MPS）。
+需要 Python 3.11（音色迁移为计算密集型，强烈建议有 NVIDIA CUDA GPU 或 Apple Silicon MPS）。支持 macOS 与 Windows。
 
-> **关于被忽略的文件**：`.venv`、`models/rvc`（RVC 仓库 clone + 其依赖 + 预训练模型）、所有 `.pth/.pt` 大模型文件都被 `.gitignore` 忽略，不纳入仓库。新克隆后运行 `setup.sh` 即可自动获取全部内容。
+> **关于被忽略的文件**：`.venv`、`models/rvc`（RVC 仓库 clone + 其依赖 + 预训练模型）、所有 `.pth/.pt` 大模型文件都被 `.gitignore` 忽略，不纳入仓库。新克隆后运行初始化脚本即可自动获取全部内容。
 
 ### 方式一：一键初始化（推荐，新克隆必用）
 
+**macOS / Linux：**
 ```bash
 git clone https://github.com/ArlexDu/MusicRemix.git
 cd MusicRemix
 bash setup.sh
 ```
 
-`setup.sh` 会自动完成（幂等，可重复运行）：
+**Windows：**
+```bat
+git clone https://github.com/ArlexDu/MusicRemix.git
+cd MusicRemix
+setup.bat
+```
+
+初始化脚本（`setup.sh` / `setup.bat`）会自动完成（幂等，可重复运行）：
 1. 创建主工程虚拟环境 `.venv`，安装 torch/demucs/faiss/transformers 等依赖
 2. clone RVC 官方仓库到 `models/rvc`
 3. 创建 RVC 独立虚拟环境 `models/rvc/venv`，安装 fairseq/RVC 依赖、ffmpeg
@@ -38,6 +46,15 @@ bash setup.sh
 5. 构造可推理的 `base_v2_48k.pth` 并 patch RVC 兼容 torch≥2.6
 
 > 国内网络已默认使用清华 PyPI 镜像加速。fairseq 需源码编译，耗时数分钟。
+> **Windows 注意**：fairseq/pyworld 编译需 [Visual Studio Build Tools](https://visualstudio.microsoft.com/visual-cpp-build-tools/)（含 C++ 桌面开发）。若编译失败，安装 Build Tools 后重跑 `setup.bat`。
+
+### 一键启动
+
+初始化完成后，双击启动脚本即可打开 Web 界面：
+- **macOS**：双击 `start.command`
+- **Windows**：双击 `start.bat`
+
+或命令行：`.venv/bin/musicremix web`（macOS）/ `.venv\Scripts\musicremix web`（Windows）
 
 完成后验证：
 ```bash
