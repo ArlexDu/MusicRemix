@@ -5,59 +5,73 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>MusicRemix · 歌曲换音色</title>
 <style>
-  :root{
-    --bg:#0f1117; --panel:#181b24; --panel2:#1f2330; --border:#2a2f3d;
-    --text:#e6e8ee; --muted:#8b91a3; --accent:#6c8cff; --accent2:#4f6bdb;
-    --ok:#3ecf8e; --err:#ff6b6b; --warn:#f5a623;
-    --radius:12px;
-  }
+  :root{--bg:#0f1117;--panel:#181b24;--panel2:#1f2330;--border:#2a2f3d;--text:#e6e8ee;
+    --muted:#8b91a3;--accent:#6c8cff;--accent2:#4f6bdb;--ok:#3ecf8e;--err:#ff6b6b;
+    --warn:#f5a623;--online:#a06cff;--radius:12px}
   *{box-sizing:border-box}
   body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"PingFang SC",sans-serif;
     background:var(--bg);color:var(--text);line-height:1.5}
-  .wrap{max-width:980px;margin:0 auto;padding:32px 20px 60px}
+  .wrap{max-width:1000px;margin:0 auto;padding:32px 20px 60px}
   h1{font-size:26px;margin:0 0 6px;display:flex;align-items:center;gap:10px}
-  h1 .logo{width:34px;height:34px;background:linear-gradient(135deg,var(--accent),#a06cff);
+  h1 .logo{width:34px;height:34px;background:linear-gradient(135deg,var(--accent),var(--online));
     border-radius:9px;display:flex;align-items:center;justify-content:center;font-size:18px}
-  .sub{color:var(--muted);margin:0 0 28px;font-size:14px}
-  .grid{display:grid;grid-template-columns:1fr 1fr;gap:18px;margin-bottom:18px}
-  @media(max-width:760px){.grid{grid-template-columns:1fr}}
-  .card{background:var(--panel);border:1px solid var(--border);border-radius:var(--radius);padding:18px}
+  .sub{color:var(--muted);margin:0 0 24px;font-size:14px}
+  .card{background:var(--panel);border:1px solid var(--border);border-radius:var(--radius);padding:18px;margin-bottom:18px}
   .card h2{margin:0 0 14px;font-size:15px;color:var(--muted);font-weight:600;letter-spacing:.3px}
-  .drop{border:2px dashed var(--border);border-radius:10px;padding:24px;text-align:center;
-    cursor:pointer;transition:.2s;background:var(--panel2)}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+  @media(max-width:760px){.grid2{grid-template-columns:1fr}}
+  /* 搜索 */
+  .search-bar{display:flex;gap:10px;margin-bottom:14px}
+  .search-bar input{flex:1;background:var(--panel2);border:1px solid var(--border);color:var(--text);
+    padding:11px 14px;border-radius:10px;font-size:14px;outline:none}
+  .search-bar input:focus{border-color:var(--accent)}
+  .btn-s{padding:11px 22px;border:none;border-radius:10px;background:linear-gradient(135deg,var(--accent),var(--accent2));
+    color:#fff;font-weight:600;cursor:pointer;font-size:14px}
+  .btn-s:disabled{opacity:.5;cursor:not-allowed}
+  .results{max-height:340px;overflow-y:auto;display:flex;flex-direction:column;gap:8px}
+  .res{display:flex;align-items:center;gap:12px;background:var(--panel2);padding:10px 12px;border-radius:10px}
+  .res img{width:44px;height:44px;border-radius:8px;object-fit:cover;background:#333;flex-shrink:0}
+  .res .info{flex:1;min-width:0}
+  .res .t{font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .res .a{font-size:12px;color:var(--muted)}
+  .res .acts{display:flex;gap:6px;flex-shrink:0}
+  .res .acts button{padding:6px 10px;border:1px solid var(--border);background:transparent;color:var(--text);
+    border-radius:7px;cursor:pointer;font-size:12px;white-space:nowrap}
+  .res .acts button:hover{border-color:var(--accent);color:var(--accent)}
+  .res .acts button.src:hover{border-color:var(--ok);color:var(--ok)}
+  .res .acts button.ref:hover{border-color:var(--online);color:var(--online)}
+  /* 上传 */
+  .drop{border:2px dashed var(--border);border-radius:10px;padding:20px;text-align:center;cursor:pointer;transition:.2s;background:var(--panel2)}
   .drop:hover,.drop.over{border-color:var(--accent);background:#1d2230}
-  .drop .icon{font-size:28px;margin-bottom:6px}
-  .drop p{margin:0;color:var(--muted);font-size:13px}
+  .drop .icon{font-size:24px;margin-bottom:4px}
+  .drop p{margin:0;color:var(--muted);font-size:12px}
+  /* 已选 */
   .files{margin-top:12px;display:flex;flex-direction:column;gap:6px}
-  .file{display:flex;align-items:center;gap:8px;background:var(--panel2);padding:8px 12px;
-    border-radius:8px;font-size:13px}
+  .file{display:flex;align-items:center;gap:8px;background:var(--panel2);padding:8px 12px;border-radius:8px;font-size:13px}
   .file .name{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-  .file .rm{cursor:pointer;color:var(--muted);font-size:16px}
+  .file .rm{cursor:pointer;color:var(--muted)}
   .file .rm:hover{color:var(--err)}
-  .badge{font-size:11px;padding:2px 8px;border-radius:10px;background:var(--accent2);color:#fff}
+  .tag{font-size:10px;padding:2px 7px;border-radius:8px}
+  .tag.local{background:#2d3748;color:#a0aec0}
+  .tag.online{background:#2d1f4a;color:var(--online)}
+  /* 参数 */
   label.f{display:block;margin-bottom:12px}
   label.f span{display:block;font-size:12px;color:var(--muted);margin-bottom:5px}
   input[type=text],input[type=number],select{width:100%;background:var(--panel2);border:1px solid var(--border);
     color:var(--text);padding:9px 12px;border-radius:8px;font-size:14px;outline:none}
   input[type=text]:focus,input[type=number]:focus,select:focus{border-color:var(--accent)}
-  .row{display:flex;gap:12px}
-  .row>div{flex:1}
+  .row{display:flex;gap:12px}.row>div{flex:1}
   input[type=range]{width:100%;accent-color:var(--accent)}
   .val{font-size:12px;color:var(--accent);font-weight:600}
-  .btn{width:100%;padding:14px;border:none;border-radius:10px;font-size:15px;font-weight:600;
-    cursor:pointer;background:linear-gradient(135deg,var(--accent),var(--accent2));color:#fff;transition:.15s}
-  .btn:hover{filter:brightness(1.1)}
-  .btn:disabled{opacity:.5;cursor:not-allowed}
-  .progress-wrap{margin-top:18px;display:none}
-  .progress-wrap.show{display:block}
+  .btn{width:100%;padding:14px;border:none;border-radius:10px;font-size:15px;font-weight:600;cursor:pointer;
+    background:linear-gradient(135deg,var(--accent),var(--accent2));color:#fff;transition:.15s}
+  .btn:hover{filter:brightness(1.1)}.btn:disabled{opacity:.5;cursor:not-allowed}
+  /* 进度/结果 */
   .bar{height:8px;background:var(--panel2);border-radius:6px;overflow:hidden;margin:10px 0}
-  .bar > div{height:100%;background:linear-gradient(90deg,var(--accent),#a06cff);transition:width .4s;width:0}
+  .bar>div{height:100%;background:linear-gradient(90deg,var(--accent),var(--online));transition:width .4s;width:0}
   .stage{display:flex;justify-content:space-between;font-size:13px;color:var(--muted);margin-bottom:4px}
   .pct{color:var(--accent);font-weight:600}
-  .msg{font-size:13px;color:var(--text);margin-top:6px;min-height:20px}
-  .result{margin-top:18px;display:none}
-  .result.show{display:block}
-  .result h3{margin:0 0 12px;font-size:15px;color:var(--muted)}
+  .msg{font-size:13px;margin-top:6px;min-height:20px}
   .audios{display:grid;grid-template-columns:1fr 1fr;gap:14px}
   @media(max-width:760px){.audios{grid-template-columns:1fr}}
   .audio-item{background:var(--panel2);border-radius:10px;padding:14px}
@@ -69,136 +83,152 @@
   .spin{display:inline-block;width:14px;height:14px;border:2px solid var(--muted);border-top-color:var(--accent);
     border-radius:50%;animation:sp .7s linear infinite;vertical-align:middle;margin-right:6px}
   @keyframes sp{to{transform:rotate(360deg)}}
+  .hint{font-size:12px;color:var(--muted);margin-top:8px}
 </style>
 </head>
 <body>
 <div class="wrap">
   <h1><span class="logo">♪</span>MusicRemix</h1>
-  <p class="sub">选择原唱歌曲与目标歌手的参考歌曲，生成换音色版本。保留原曲旋律与伴奏，仅替换演唱者音色。</p>
+  <p class="sub">选择原唱歌曲与目标歌手参考歌曲，生成换音色版本。支持在线搜索（Audius 免费音乐库）或本地上传。</p>
 
-  <div class="grid">
+  <!-- 在线搜索 -->
+  <div class="card">
+    <h2>① 在线搜索歌曲（Audius 免费音乐库 · 独立音乐人作品）</h2>
+    <div class="search-bar">
+      <input type="text" id="searchInput" placeholder="输入歌曲名或歌手名搜索..." onkeydown="if(event.key==='Enter')doSearch()">
+      <button class="btn-s" id="searchBtn" onclick="doSearch()">搜索</button>
+    </div>
+    <div class="results" id="results"></div>
+    <div class="hint">提示：Audius 为独立音乐人作品，非商业平台流行歌曲。流行歌曲请通过购买等合法途径获取后本地上传。</div>
+  </div>
+
+  <!-- 本地上传 -->
+  <div class="grid2">
     <div class="card">
-      <h2>① 原唱歌曲（歌手 A）</h2>
+      <h2>② 本地上传原唱（歌手 A）</h2>
       <div class="drop" id="dropSrc">
-        <div class="icon">🎤</div>
-        <p>点击或拖拽上传 · wav/mp3/flac</p>
+        <div class="icon">🎤</div><p>点击或拖拽 · wav/mp3/flac</p>
         <input type="file" id="srcInput" accept="audio/*" hidden>
       </div>
       <div class="files" id="srcFiles"></div>
     </div>
     <div class="card">
-      <h2>② 参考歌曲（目标歌手 B，可多首）</h2>
+      <h2>③ 本地上传参考（目标歌手 B，可多首）</h2>
       <div class="drop" id="dropRef">
-        <div class="icon">🎵</div>
-        <p>点击或拖拽上传 · 建议 3-5 首覆盖不同音域</p>
+        <div class="icon">🎵</div><p>点击或拖拽 · 建议 3-5 首</p>
         <input type="file" id="refInput" accept="audio/*" multiple hidden>
       </div>
       <div class="files" id="refFiles"></div>
     </div>
   </div>
 
-  <div class="card" style="margin-bottom:18px">
-    <h2>③ 参数设置</h2>
+  <!-- 参数 -->
+  <div class="card">
+    <h2>④ 参数设置</h2>
     <div class="row">
-      <div>
-        <label class="f"><span>音色模型</span>
-          <select id="modelName"></select>
-        </label>
-      </div>
-      <div>
-        <label class="f"><span>目标歌手标识</span>
-          <input type="text" id="targetId" value="singerB" placeholder="用于索引缓存">
-        </label>
-      </div>
+      <div><label class="f"><span>音色模型</span><select id="modelName"></select></label></div>
+      <div><label class="f"><span>目标歌手标识</span><input type="text" id="targetId" value="singerB"></label></div>
     </div>
     <div class="row">
-      <div>
-        <label class="f"><span>音高算法</span>
-          <select id="f0method"><option>rmvpe</option><option>crepe</option><option>pm</option><option>harvest</option></select>
-        </label>
-      </div>
-      <div>
-        <label class="f"><span>半音偏移 <span class="val" id="pitchVal">0</span></span>
-          <input type="range" id="pitch" min="-24" max="24" value="0" step="1">
-        </label>
-      </div>
+      <div><label class="f"><span>音高算法</span><select id="f0method"><option>rmvpe</option><option>crepe</option><option>pm</option><option>harvest</option></select></label></div>
+      <div><label class="f"><span>半音偏移 <span class="val" id="pitchVal">0</span></span><input type="range" id="pitch" min="-24" max="24" value="0"></label></div>
     </div>
     <div class="row">
-      <div>
-        <label class="f"><span>检索强度 index_rate <span class="val" id="irVal">0.75</span></span>
-          <input type="range" id="indexRate" min="0" max="1" value="0.75" step="0.05">
-        </label>
-      </div>
-      <div>
-        <label class="f"><span>人声音量 <span class="val" id="vvVal">1.0</span></span>
-          <input type="range" id="vocalVol" min="0" max="2" value="1.0" step="0.1">
-        </label>
-      </div>
+      <div><label class="f"><span>检索强度 <span class="val" id="irVal">0.75</span></span><input type="range" id="indexRate" min="0" max="1" value="0.75" step="0.05"></label></div>
+      <div><label class="f"><span>人声音量 <span class="val" id="vvVal">1.0</span></span><input type="range" id="vocalVol" min="0" max="2" value="1.0" step="0.1"></label></div>
     </div>
     <button class="btn" id="submitBtn" disabled>开始换音色</button>
   </div>
 
-  <div class="card progress-wrap" id="progressWrap">
+  <div class="card" id="progressWrap" style="display:none">
     <div class="stage"><span id="stageLabel">准备中...</span><span class="pct" id="pct">0%</span></div>
     <div class="bar"><div id="bar"></div></div>
     <div class="msg" id="msg"></div>
     <div class="err" id="errBox"></div>
   </div>
 
-  <div class="card result" id="resultWrap">
-    <h3>④ 结果试听与下载</h3>
+  <div class="card" id="resultWrap" style="display:none">
+    <h2>结果试听与下载</h2>
     <div class="audios" id="audios"></div>
   </div>
 </div>
 
 <script>
 const $=id=>document.getElementById(id);
-let srcFile=null, refFiles=[];
+// source: {type:'local',file} | {type:'online',id,title,artist} | null
+let source=null, references=[];  // references: [{type,file|id,...}]
 
-// 拖拽与选择
+// ===== 在线搜索 =====
+async function doSearch(){
+  const q=$('searchInput').value.trim(); if(!q) return;
+  $('searchBtn').disabled=true; $('searchBtn').textContent='搜索中...';
+  $('results').innerHTML='<div style="color:var(--muted);padding:12px;text-align:center"><span class="spin"></span>搜索中</div>';
+  try{
+    const r=await fetch(`/api/search?q=${encodeURIComponent(q)}&limit=15`).then(r=>r.json());
+    if(!r.results||!r.results.length){$('results').innerHTML='<div style="color:var(--muted);padding:12px">无结果</div>';return}
+    $('results').innerHTML=r.results.map(t=>`
+      <div class="res">
+        ${t.artwork?`<img src="${t.artwork}" onerror="this.style.display='none'">`:'<div style="width:44px;height:44px;background:#333;border-radius:8px"></div>'}
+        <div class="info"><div class="t">${t.title}</div><div class="a">${t.artist} · ${Math.round(t.duration/60)}:${String(t.duration%60).padStart(2,'0')}${t.genre?' · '+t.genre:''}</div></div>
+        <div class="acts">
+          <button class="src" onclick="pickSource('${t.id}','${esc(t.title)}','${esc(t.artist)}')">用作原唱</button>
+          <button class="ref" onclick="pickRef('${t.id}','${esc(t.title)}','${esc(t.artist)}')">加入参考</button>
+        </div>
+      </div>`).join('');
+  }catch(e){$('results').innerHTML=`<div style="color:var(--err);padding:12px">搜索失败: ${e.message}</div>`}
+  finally{$('searchBtn').disabled=false;$('searchBtn').textContent='搜索'}
+}
+function esc(s){return String(s).replace(/'/g,"\\'").replace(/"/g,'&quot;')}
+function pickSource(id,title,artist){source={type:'online',id,title,artist};renderAll()}
+function pickRef(id,title,artist){if(!references.find(r=>r.type==='online'&&r.id===id)){references.push({type:'online',id,title,artist});renderAll()}}
+
+// ===== 本地上传 =====
 function bindDrop(dropId,inputId,isRef){
-  const drop=$(dropId), input=$(inputId);
-  drop.addEventListener('click',()=>input.click());
-  drop.addEventListener('dragover',e=>{e.preventDefault();drop.classList.add('over')});
-  drop.addEventListener('dragleave',()=>drop.classList.remove('over'));
-  drop.addEventListener('drop',e=>{e.preventDefault();drop.classList.remove('over');handleFiles(e.dataTransfer.files,isRef)});
-  input.addEventListener('change',e=>handleFiles(e.target.files,isRef));
+  const drop=$(dropId),input=$(inputId);
+  drop.onclick=()=>input.click();
+  drop.ondragover=e=>{e.preventDefault();drop.classList.add('over')};
+  drop.ondragleave=()=>drop.classList.remove('over');
+  drop.ondrop=e=>{e.preventDefault();drop.classList.remove('over');handleFiles(e.dataTransfer.files,isRef)};
+  input.onchange=e=>handleFiles(e.target.files,isRef);
 }
 function handleFiles(files,isRef){
-  if(!isRef){ if(files[0]){srcFile=files[0];renderSrc()} }
-  else { for(const f of files) refFiles.push(f); renderRefs() }
-  checkReady();
+  if(!isRef){if(files[0]){source={type:'local',file:files[0]}}}
+  else{for(const f of files)references.push({type:'local',file:f})}
+  renderAll();
 }
-function renderSrc(){
-  $('srcFiles').innerHTML = srcFile ? `<div class="file"><span>🎤</span><span class="name">${srcFile.name}</span><span class="rm" onclick="srcFile=null;renderSrc();checkReady()">✕</span></div>`:'';
-}
-function renderRefs(){
-  $('refFiles').innerHTML = refFiles.map((f,i)=>`<div class="file"><span class="badge">${i+1}</span><span class="name">${f.name}</span><span class="rm" onclick="refFiles.splice(${i},1);renderRefs();checkReady()">✕</span></div>`).join('');
-}
-function checkReady(){ $('submitBtn').disabled = !(srcFile && refFiles.length>0); }
 bindDrop('dropSrc','srcInput',false);
 bindDrop('dropRef','refInput',true);
 
-// 滑块实时值
+// ===== 渲染 =====
+function renderAll(){
+  // 原唱
+  $('srcFiles').innerHTML=source?`<div class="file"><span class="tag ${source.type==='local'?'local':'online'}">${source.type==='local'?'本地':'在线'}</span><span class="name">${source.type==='local'?source.file.name:source.title+' - '+source.artist}</span><span class="rm" onclick="source=null;renderAll()">✕</span></div>`:'';
+  // 参考
+  $('refFiles').innerHTML=references.map((r,i)=>`<div class="file"><span class="tag ${r.type==='local'?'local':'online'}">${r.type==='local'?'本地':'在线'}</span><span class="name">${r.type==='local'?r.file.name:r.title+' - '+r.artist}</span><span class="rm" onclick="references.splice(${i},1);renderAll()">✕</span></div>`).join('');
+  $('submitBtn').disabled=!(source&&references.length>0);
+}
 $('pitch').oninput=e=>$('pitchVal').textContent=e.target.value;
 $('indexRate').oninput=e=>$('irVal').textContent=e.target.value;
 $('vocalVol').oninput=e=>$('vvVal').textContent=e.target.value;
 
-// 加载可用模型
+// ===== 模型列表 =====
 async function loadModels(){
-  try{
-    const [ms,cf]=await Promise.all([fetch('/api/models').then(r=>r.json()),fetch('/api/config').then(r=>r.json())]);
-    const sel=$('modelName');
-    sel.innerHTML=(ms.models||[]).map(m=>`<option value="${m}" ${m===cf.default_model?'selected':''}>${m}</option>`).join('') || '<option>base_v2_48k.pth</option>';
-  }catch(e){ $('modelName').innerHTML='<option>base_v2_48k.pth</option>' }
+  try{const [ms,cf]=await Promise.all([fetch('/api/models').then(r=>r.json()),fetch('/api/config').then(r=>r.json())]);
+    $('modelName').innerHTML=(ms.models||[]).map(m=>`<option value="${m}" ${m===cf.default_model?'selected':''}>${m}</option>`).join('')||'<option>base_v2_48k.pth</option>'}
+  catch(e){$('modelName').innerHTML='<option>base_v2_48k.pth</option>'}
 }
 loadModels();
 
-// 提交任务
+// ===== 提交 =====
 $('submitBtn').onclick=async()=>{
   const fd=new FormData();
-  fd.append('source',srcFile);
-  refFiles.forEach(f=>fd.append('references',f));
+  // 源歌曲
+  if(source.type==='online') fd.append('source_file_id',source.id);
+  else fd.append('source',source.file);
+  // 参考歌曲：本地 append 'references'，在线收集 ids
+  const onlineRefIds=[];
+  for(const r of references){if(r.type==='local') fd.append('references',r.file); else onlineRefIds.push(r.id)}
+  if(onlineRefIds.length) fd.append('reference_file_ids',onlineRefIds.join(','));
   fd.append('model_name',$('modelName').value);
   fd.append('target_id',$('targetId').value||'singerB');
   fd.append('index_rate',$('indexRate').value);
@@ -210,58 +240,41 @@ $('submitBtn').onclick=async()=>{
   fd.append('device','auto');
 
   $('submitBtn').disabled=true;
-  $('progressWrap').classList.add('show');
-  $('resultWrap').classList.remove('show');
+  $('progressWrap').style.display='block';
+  $('resultWrap').style.display='none';
   $('errBox').classList.remove('show');
   $('bar').style.width='0%';$('pct').textContent='0%';
-  $('stageLabel').innerHTML='<span class="spin"></span>上传中...';
-  $('msg').textContent='正在上传文件...';
-
+  $('stageLabel').innerHTML='<span class="spin"></span>提交中...';
+  $('msg').textContent='正在准备歌曲...';
   try{
     const r=await fetch('/api/remix',{method:'POST',body:fd});
     if(!r.ok){const e=await r.json();throw new Error(e.detail||'提交失败')}
-    const {task_id}=await r.json();
-    poll(task_id);
-  }catch(e){ showError(e.message) }
+    poll((await r.json()).task_id);
+  }catch(e){showError(e.message)}
 };
-
-let pollTimer=null;
-function poll(taskId){
-  clearInterval(pollTimer);
-  pollTimer=setInterval(async()=>{
-    try{
-      const t=await fetch(`/api/tasks/${taskId}`).then(r=>r.json());
-      updateProgress(t);
-      if(t.status==='done'){clearInterval(pollTimer);showResult(taskId);$('submitBtn').disabled=false}
-      if(t.status==='error'){clearInterval(pollTimer);showError(t.error);$('submitBtn').disabled=false}
+let pt=null;
+function poll(tid){
+  clearInterval(pt);
+  pt=setInterval(async()=>{
+    try{const t=await fetch(`/api/tasks/${tid}`).then(r=>r.json());updateProg(t);
+      if(t.status==='done'){clearInterval(pt);showResult(tid);$('submitBtn').disabled=false}
+      if(t.status==='error'){clearInterval(pt);showError(t.error);$('submitBtn').disabled=false}
     }catch(e){}
   },1500);
 }
-function updateProgress(t){
-  $('bar').style.width=t.progress+'%';
-  $('pct').textContent=t.progress+'%';
-  const spin=t.status==='running'?'<span class="spin"></span>':'';
-  $('stageLabel').innerHTML=spin+(t.stage_label||t.stage||'处理中');
+function updateProg(t){
+  $('bar').style.width=t.progress+'%';$('pct').textContent=t.progress+'%';
+  const sp=t.status==='running'?'<span class="spin"></span>':'';
+  $('stageLabel').innerHTML=sp+(t.stage_label||t.stage||'处理中');
   $('msg').textContent=t.message||'';
 }
-function showError(msg){
-  $('errBox').textContent=msg;$('errBox').classList.add('show');
-  $('stageLabel').textContent='失败';$('msg').textContent='';
+function showError(m){$('errBox').textContent=m;$('errBox').classList.add('show');$('stageLabel').textContent='失败';$('msg').textContent=''}
+function showResult(tid){
+  $('resultWrap').style.display='block';
+  const items=[{k:'final',l:'🎵 换音色结果'},{k:'converted',l:'🎤 转换后人声'},{k:'vocals',l:'🎙 原曲人声'},{k:'accompaniment',l:'🎹 原曲伴奏'}];
+  $('audios').innerHTML=items.map(it=>`<div class="audio-item"><div class="ttl"><span>${it.l}</span><a class="dl" href="/api/tasks/${tid}/file/${it.k}" download>下载</a></div><audio controls preload="none" src="/api/tasks/${tid}/file/${it.k}"></audio></div>`).join('');
 }
-function showResult(taskId){
-  $('resultWrap').classList.add('show');
-  const items=[
-    {k:'final',label:'🎵 换音色结果'},
-    {k:'converted',label:'🎤 转换后人声'},
-    {k:'vocals',label:'🎙 原曲人声'},
-    {k:'accompaniment',label:'🎹 原曲伴奏'},
-  ];
-  $('audios').innerHTML=items.map(it=>`
-    <div class="audio-item">
-      <div class="ttl"><span>${it.label}</span><a class="dl" href="/api/tasks/${taskId}/file/${it.k}" download>下载</a></div>
-      <audio controls preload="none" src="/api/tasks/${taskId}/file/${it.k}"></audio>
-    </div>`).join('');
-}
+renderAll();
 </script>
 </body>
 </html>

@@ -13,10 +13,12 @@ from pathlib import Path
 from fastapi import FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
+from typing import Optional
 
 from ..config import get_config
 from ..conversion.base import ConversionParams
 from ..remix.base import MixParams
+from . import audius
 from .tasks import manager
 
 logger = logging.getLogger(__name__)
@@ -71,11 +73,38 @@ async def default_config():
     }
 
 
+# -- 在线歌曲（Audius 合法免费源）----------------------------------------
+@app.get("/api/search")
+async def search_tracks(q: str, limit: int = 12):
+    """搜索 Audius 在线歌曲（独立音乐人作品，可自由下载）。"""
+    try:
+        results = audius.search(q, limit=limit)
+        return {"query": q, "count": len(results), "results": results}
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=f"搜索失败: {e}")
+
+
+@app.get("/api/audius/download/{track_id}")
+async def download_track(track_id: str):
+    """下载 Audius 歌曲到本地缓存，返回 file_id 供 remix 使用。"""
+    try:
+        path = audius.download(track_id)
+        info = audius.track_info(track_id)
+        return {
+            "file_id": track_id,
+            "path": str(path),
+            "filename": f"{info['artist']} - {info['title']}.mp3",
+            "title": info["title"],
+            "artist": info["artist"],
+            "duration": info["duration"],
+        }
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=f"下载失败: {e}")
+
+
 # -- 任务 API ------------------------------------------------------------
 @app.post("/api/remix")
 async def create_remix(
-    source: UploadFile = File(..., description="原唱歌曲（歌手 A）"),
-    references: list[UploadFile] = File(..., description="目标歌手参考歌曲（可多首）"),
     model_name: str = Form("base_v2_48k.pth"),
     target_id: str = Form("target"),
     index_rate: float = Form(0.75),
@@ -85,25 +114,36 @@ async def create_remix(
     accompaniment_volume: float = Form(1.0),
     output_sr: int = Form(44100),
     device: str = Form("auto"),
+    source: Optional[UploadFile] = File(None, description="原唱歌曲（上传，与 source_file_id 二选一）"),
+    references: list[UploadFile] = File(default=[], description="参考歌曲（上传）"),
+    source_file_id: Optional[str] = Form(None, description="原唱歌曲 Audius track_id（在线选歌）"),
+    reference_file_ids: str = Form("", description="参考歌曲 Audius track_id 列表，逗号分隔"),
 ):
-    """创建换音色任务。上传源歌曲与参考歌曲，返回 task_id。"""
-    if not references:
-        raise HTTPException(status_code=400, detail="至少需要 1 首参考歌曲")
-
+    """创建换音色任务。支持本地上传或 Audius 在线选歌（file_id）。"""
     task = manager.create()
     wd = task.workdir
 
-    # 保存上传文件
-    src_path = wd / f"source_{source.filename}"
-    with open(src_path, "wb") as f:
-        shutil.copyfileobj(source.file, f)
+    # 源歌曲：在线选歌优先，否则用上传文件
+    if source_file_id:
+        src_path = audius.download(source_file_id)
+    elif source is not None:
+        src_path = wd / f"source_{source.filename}"
+        with open(src_path, "wb") as f:
+            shutil.copyfileobj(source.file, f)
+    else:
+        raise HTTPException(status_code=400, detail="需要提供 source（上传）或 source_file_id（在线）")
 
-    ref_paths = []
+    # 参考歌曲：上传 + 在线
+    ref_paths: list[Path] = []
     for i, ref in enumerate(references):
         rp = wd / f"ref_{i}_{ref.filename}"
         with open(rp, "wb") as f:
             shutil.copyfileobj(ref.file, f)
         ref_paths.append(rp)
+    for tid in [s.strip() for s in reference_file_ids.split(",") if s.strip()]:
+        ref_paths.append(audius.download(tid))
+    if not ref_paths:
+        raise HTTPException(status_code=400, detail="至少需要 1 首参考歌曲")
 
     params = ConversionParams(
         index_rate=index_rate, f0_method=f0_method, pitch=pitch,
