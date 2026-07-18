@@ -11,7 +11,7 @@ import shutil
 from pathlib import Path
 
 from fastapi import FastAPI, File, Form, HTTPException, UploadFile
-from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from typing import Optional
 
@@ -100,6 +100,31 @@ async def download_track(track_id: str):
         }
     except Exception as e:
         raise HTTPException(status_code=502, detail=f"下载失败: {e}")
+
+
+@app.get("/api/audius/stream/{track_id}")
+async def stream_track(track_id: str):
+    """流式播放 Audius 歌曲（试听，不落盘）。"""
+    import urllib.request
+
+    url = f"{audius.AUDIUS_HOST}/v1/tracks/{track_id}/stream?app_name={audius.APP_NAME}"
+    req = urllib.request.Request(url, headers={"User-Agent": f"{audius.APP_NAME}/0.1"})
+    try:
+        resp = urllib.request.urlopen(req, timeout=30)
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=f"播放失败: {e}")
+
+    def gen():
+        try:
+            while True:
+                chunk = resp.read(1 << 16)  # 64KB
+                if not chunk:
+                    break
+                yield chunk
+        finally:
+            resp.close()
+
+    return StreamingResponse(gen(), media_type="audio/mpeg")
 
 
 # -- 任务 API ------------------------------------------------------------

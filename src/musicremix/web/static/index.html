@@ -40,6 +40,7 @@
   .res .acts button:hover{border-color:var(--accent);color:var(--accent)}
   .res .acts button.src:hover{border-color:var(--ok);color:var(--ok)}
   .res .acts button.ref:hover{border-color:var(--online);color:var(--online)}
+  .res .acts button.play.playing{border-color:var(--warn);color:var(--warn)}
   /* 上传 */
   .drop{border:2px dashed var(--border);border-radius:10px;padding:20px;text-align:center;cursor:pointer;transition:.2s;background:var(--panel2)}
   .drop:hover,.drop.over{border-color:var(--accent);background:#1d2230}
@@ -171,6 +172,7 @@ async function doSearch(){
         ${t.artwork?`<img src="${t.artwork}" onerror="this.style.display='none'">`:'<div style="width:44px;height:44px;background:#333;border-radius:8px"></div>'}
         <div class="info"><div class="t">${t.title}</div><div class="a">${t.artist} · ${Math.round(t.duration/60)}:${String(t.duration%60).padStart(2,'0')}${t.genre?' · '+t.genre:''}</div></div>
         <div class="acts">
+          <button class="play" id="play_${t.id}" onclick="togglePlay('${t.id}')">试听</button>
           <button class="src" onclick="pickSource('${t.id}','${esc(t.title)}','${esc(t.artist)}')">用作原唱</button>
           <button class="ref" onclick="pickRef('${t.id}','${esc(t.title)}','${esc(t.artist)}')">加入参考</button>
         </div>
@@ -181,6 +183,20 @@ async function doSearch(){
 function esc(s){return String(s).replace(/'/g,"\\'").replace(/"/g,'&quot;')}
 function pickSource(id,title,artist){source={type:'online',id,title,artist};renderAll()}
 function pickRef(id,title,artist){if(!references.find(r=>r.type==='online'&&r.id===id)){references.push({type:'online',id,title,artist});renderAll()}}
+
+// ===== 试听播放（单实例，切歌自动停上一首）=====
+let audioEl=null, playingId=null;
+function togglePlay(id){
+  const btn=$('play_'+id);
+  if(playingId===id){  // 当前正在播这首 → 暂停
+    audioEl.pause(); playingId=null; btn.textContent='试听'; btn.classList.remove('playing'); return;
+  }
+  if(audioEl){ audioEl.pause(); const prev=$('play_'+playingId); if(prev){prev.textContent='试听';prev.classList.remove('playing')} }
+  if(!audioEl){ audioEl=new Audio(); audioEl.onended=()=>{const b=$('play_'+playingId);if(b){b.textContent='试听';b.classList.remove('playing')};playingId=null}; }
+  audioEl.src=`/api/audius/stream/${id}`;
+  audioEl.play().catch(e=>{btn.textContent='失败';return});
+  playingId=id; btn.textContent='⏸ 暂停'; btn.classList.add('playing');
+}
 
 // ===== 本地上传 =====
 function bindDrop(dropId,inputId,isRef){
