@@ -107,7 +107,8 @@ async def stream_track(track_id: str):
     """播放 Audius 歌曲（试听，从缓存文件返回，支持 seek）。"""
     try:
         path = audius.download(track_id)  # 幂等：已缓存则直接返回，否则下载
-        return FileResponse(str(path), media_type="audio/mpeg", filename=f"{track_id}.mp3")
+        # 不传 filename，避免 Content-Disposition: attachment 让浏览器误判
+        return FileResponse(str(path), media_type="audio/mpeg")
     except Exception as e:
         raise HTTPException(status_code=502, detail=f"播放失败: {e}")
 

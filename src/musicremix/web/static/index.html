@@ -186,16 +186,32 @@ function pickRef(id,title,artist){if(!references.find(r=>r.type==='online'&&r.id
 
 // ===== 试听播放（单实例，切歌自动停上一首）=====
 let audioEl=null, playingId=null;
-function togglePlay(id){
+async function togglePlay(id){
   const btn=$('play_'+id);
   if(playingId===id){  // 当前正在播这首 → 暂停
     audioEl.pause(); playingId=null; btn.textContent='试听'; btn.classList.remove('playing'); return;
   }
   if(audioEl){ audioEl.pause(); const prev=$('play_'+playingId); if(prev){prev.textContent='试听';prev.classList.remove('playing')} }
-  if(!audioEl){ audioEl=new Audio(); audioEl.onended=()=>{const b=$('play_'+playingId);if(b){b.textContent='试听';b.classList.remove('playing')};playingId=null}; }
+  // HEAD 预检查后端状态（避免后端报错返回 JSON 导致 audio 元素 NotSupportedError）
+  btn.textContent='加载中...';
+  try{
+    const r = await fetch(`/api/audius/stream/${id}`, {method:'HEAD'});
+    if(!r.ok){
+      const e = await r.json().catch(()=>({detail:r.statusText}));
+      throw new Error(e.detail || `HTTP ${r.status}`);
+    }
+    const ct = r.headers.get('content-type')||'';
+    if(!ct.startsWith('audio/')) throw new Error('返回非音频: '+ct);
+  }catch(e){
+    btn.textContent='试听';
+    alert('播放失败: '+e.message);
+    return;
+  }
+  // 正常播放
+  if(!audioEl){ audioEl=new Audio(); audioEl.preload='auto'; audioEl.onended=()=>{const b=$('play_'+playingId);if(b){b.textContent='试听';b.classList.remove('playing')};playingId=null}; }
   audioEl.src=`/api/audius/stream/${id}`;
   audioEl.load();
-  audioEl.play().catch(e=>{btn.textContent='失败';console.error('播放失败:',e);alert('播放失败: '+e.name+'\n'+(e.message||'请查看浏览器控制台'))});
+  audioEl.play().catch(e=>{btn.textContent='失败';console.error('播放:',e);alert('播放: '+e.name+' '+e.message)});
   playingId=id; btn.textContent='⏸ 暂停'; btn.classList.add('playing');
 }
 
