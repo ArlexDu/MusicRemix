@@ -102,12 +102,11 @@ async def download_track(track_id: str):
         raise HTTPException(status_code=502, detail=f"下载失败: {e}")
 
 
-@app.get("/api/audius/stream/{track_id}")
+@app.api_route("/api/audius/stream/{track_id}", methods=["GET", "HEAD"])
 async def stream_track(track_id: str):
-    """播放 Audius 歌曲（试听，从缓存文件返回，支持 seek）。"""
+    """播放 Audius 歌曲（试听，GET 返回音频，HEAD 用于预检查）。"""
     try:
-        path = audius.download(track_id)  # 幂等：已缓存则直接返回，否则下载
-        # 不传 filename，避免 Content-Disposition: attachment 让浏览器误判
+        path = audius.download(track_id)  # 幂等：已缓存则直接返回
         return FileResponse(str(path), media_type="audio/mpeg")
     except Exception as e:
         raise HTTPException(status_code=502, detail=f"播放失败: {e}")
