@@ -25,7 +25,7 @@ htmlcov/
 .ruff_cache/
 
 # Model cache & runtime artifacts (do not commit large binaries)
-~/.musicremix/
+cache/
 # 外部模型引擎目录：保留 README，忽略 clone 的仓库与大权重
 models/*/
 !models/README.md

@@ -3,15 +3,30 @@
 from __future__ import annotations
 
 import os
+import shutil
 from dataclasses import dataclass, field
 from pathlib import Path
 
 
+def _project_root() -> Path:
+    """定位项目根目录（config.py 位于 src/musicremix/ 下，往上三级）。"""
+    return Path(__file__).resolve().parents[2]
+
+
 def _default_cache_dir() -> Path:
-    """本地模型缓存目录，默认 ~/.musicremix/。"""
+    """运行时缓存目录，默认项目根目录下的 cache/。
+
+    优先级：环境变量 MUSICREMIX_CACHE_DIR > 项目根/cache。
+    历史数据在 ~/.musicremix/ 时，首次启动自动迁移到项目内。
+    """
     env = os.environ.get("MUSICREMIX_CACHE_DIR")
     if env:
         return Path(env).expanduser()
+    return _project_root() / "cache"
+
+
+def _legacy_cache_dir() -> Path:
+    """历史缓存目录（~/.musicremix/），用于检测并迁移。"""
     return Path.home() / ".musicremix"
 
 
@@ -42,6 +57,46 @@ class Config:
     chunk_seconds: float = 30.0
     # 分片重叠（秒），用于交叉淡入淡出
     chunk_overlap: float = 1.0
+    # 标记是否已执行过旧目录迁移
+    _migrated: bool = field(default=False, repr=False)
+
+    def __post_init__(self):
+        self._migrate_legacy_cache()
+
+    def _migrate_legacy_cache(self):
+        """首次启动时，把 ~/.musicremix/ 的历史数据迁移到项目内 cache/。"""
+        if self._migrated:
+            return
+        self._migrated = True
+        # 环境变量指定了自定义路径则不迁移
+        if os.environ.get("MUSICREMIX_CACHE_DIR"):
+            return
+        legacy = _legacy_cache_dir()
+        if not legacy.exists() or legacy == self.cache_dir:
+            return
+        # 仅当目标目录为空或不存在时才迁移（避免覆盖）
+        target = Path(self.cache_dir)
+        target.mkdir(parents=True, exist_ok=True)
+        existing = [p for p in target.iterdir()] if target.exists() else []
+        if existing:
+            return  # 目标已有数据，不迁移
+        try:
+            for item in legacy.iterdir():
+                dst = target / item.name
+                if not dst.exists():
+                    shutil.move(str(item), str(dst))
+            import logging
+            logging.getLogger(__name__).info(
+                "已迁移历史缓存 %s -> %s", legacy, target
+            )
+            # 旧目录空了就删
+            try:
+                legacy.rmdir()
+            except OSError:
+                pass
+        except Exception:
+            import logging
+            logging.getLogger(__name__).warning("历史缓存迁移失败（已忽略）", exc_info=True)
 
     @property
     def models_dir(self) -> Path:
