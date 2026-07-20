@@ -15,6 +15,7 @@ import os
 import random
 import subprocess
 from pathlib import Path
+from typing import Callable, Optional
 
 from .config import Config, get_config
 from .separation.base import get_separator
@@ -24,6 +25,19 @@ from .utils.device import Device, detect_device
 logger = logging.getLogger(__name__)
 
 SR_DICT = {"32k": 32000, "40k": 40000, "48k": 48000}
+
+# 进度回调签名: (stage_desc: str, sub_progress: int 0-100)
+ProgressCB = Optional[Callable[[str, int], None]]
+
+
+def _safe_cb(cb: ProgressCB, stage: str, sub: int):
+    """安全触发进度回调（吞异常，避免回调失败中断训练）。"""
+    if cb is None:
+        return
+    try:
+        cb(stage, max(0, min(100, int(sub))))
+    except Exception:
+        logger.debug("进度回调异常（已忽略）", exc_info=True)
 
 
 def _venv_python(rvc_home: Path) -> str:
@@ -70,6 +84,7 @@ def train_model(
     device: str = "auto",
     n_p: int = 4,
     config: Config | None = None,
+    progress_cb: ProgressCB = None,
 ) -> Path:
     """训练目标歌手 RVC 模型。
 
@@ -85,6 +100,7 @@ def train_model(
         save_epoch: 每隔几轮保存一次
         device: cpu/cuda/mps（mps 会降级 cpu）
         n_p: 并发进程数
+        progress_cb: 进度回调 (stage_desc, sub_progress 0-100)
 
     Returns:
         训练产出的 .pth 路径
@@ -115,29 +131,36 @@ def train_model(
     if any((logs_dir / "0_gt_wavs").glob("*.wav")):
         logger.info("阶段 1/4: preprocess 已完成，跳过")
     else:
+        _safe_cb(progress_cb, "预处理（重采样切片）", 0)
         logger.info("阶段 1/4: preprocess（重采样切片）")
         run([python, "infer/modules/train/preprocess.py", str(input_dir), str(sr_int), str(n_p),
              str(logs_dir), "False", "3.0"], "preprocess")
+    _safe_cb(progress_cb, "预处理完成", 20)
 
     # 2. extract_f0（提取音高）— 产出 2a_f0
     if any((logs_dir / "2a_f0").glob("*.npy")):
         logger.info("阶段 2/4: extract_f0 已完成，跳过")
     else:
+        _safe_cb(progress_cb, "提取音高（f0）", 20)
         logger.info("阶段 2/4: extract_f0（提取音高）")
         run([python, "infer/modules/train/extract/extract_f0_print.py", str(logs_dir), str(n_p), f0method],
             "extract_f0")
+    _safe_cb(progress_cb, "音高提取完成", 40)
 
     # 3. extract_feature（提 HuBERT 特征）— 产出 3_feature768
     feat_subdir = "3_feature256" if version == "v1" else "3_feature768"
     if any((logs_dir / feat_subdir).glob("*.npy")):
         logger.info("阶段 3/4: extract_feature 已完成，跳过")
     else:
+        _safe_cb(progress_cb, "提取 HuBERT 特征", 40)
         logger.info("阶段 3/4: extract_feature（提取 HuBERT 特征）")
         for i_part in range(n_p):
             run([python, "infer/modules/train/extract_feature_print.py", rvc_device, str(n_p), str(i_part),
                  str(logs_dir), version, "False"], f"extract_feature p{i_part}")
+    _safe_cb(progress_cb, "特征提取完成", 60)
 
     # 4. 生成 filelist + config + 训练
+    _safe_cb(progress_cb, "模型微调训练中", 60)
     logger.info("阶段 4/4: 生成 filelist/config + 训练")
     _gen_filelist(now_dir, exp_dir, sr, version)
     _gen_config(now_dir, exp_dir, sr, version)
@@ -150,6 +173,7 @@ def train_model(
                  "-pg", pretrained_G, "-pd", pretrained_D,
                  "-l", "1", "-c", "0", "-sw", "1", "-v", version]
     run(train_cmd, "train")
+    _safe_cb(progress_cb, "模型微调完成", 100)
 
     # 查找产出 .pth（sw=1 每轮保存到 assets/weights/）
     weights_dir = now_dir / "assets" / "weights"
@@ -221,11 +245,23 @@ def run_training(
     reference_songs: list[str | Path],
     model_name: str,
     workdir: str | Path | None = None,
+    progress_cb: ProgressCB = None,
     **kwargs,
 ) -> Path:
-    """完整训练流程：分离参考歌曲人声 + RVC 训练。"""
+    """完整训练流程：分离参考歌曲人声 + RVC 训练。
+
+    进度映射：分离人声 0-10%，RVC 训练 10-100%。
+    """
     config = get_config()
     workdir = Path(workdir) if workdir else config.workdir_resolved
     train_data_dir = workdir / f"train_data_{model_name}"
+
+    _safe_cb(progress_cb, "分离参考歌曲人声", 0)
     prepare_dataset(reference_songs, train_data_dir, device=kwargs.get("device", "auto"), config=config)
-    return train_model(train_data_dir, model_name, config=config, **kwargs)
+    _safe_cb(progress_cb, "参考人声分离完成", 10)
+
+    # RVC 训练内部子阶段映射到 10-100%
+    def _train_cb(stage: str, sub: int):
+        _safe_cb(progress_cb, stage, 10 + int(sub * 0.9))
+
+    return train_model(train_data_dir, model_name, config=config, progress_cb=_train_cb, **kwargs)

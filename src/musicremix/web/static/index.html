@@ -85,6 +85,8 @@
     border-radius:50%;animation:sp .7s linear infinite;vertical-align:middle;margin-right:6px}
   @keyframes sp{to{transform:rotate(360deg)}}
   .hint{font-size:12px;color:var(--muted);margin-top:8px}
+  .train-box{background:var(--panel2);border:1px solid var(--border);border-radius:10px;padding:14px;margin-bottom:14px}
+  .train-box .hint{margin-top:8px;color:var(--warn)}
 </style>
 </head>
 <body>
@@ -129,6 +131,17 @@
     <div class="row">
       <div><label class="f"><span>音色模型</span><select id="modelName"></select></label></div>
       <div><label class="f"><span>目标歌手标识</span><input type="text" id="targetId" value="singerB"></label></div>
+    </div>
+    <div class="train-box" id="trainBox">
+      <label class="f" style="display:flex;align-items:center;gap:8px;margin-bottom:10px;cursor:pointer">
+        <input type="checkbox" id="autoTrain" checked style="width:auto;accent-color:var(--accent)">
+        <span style="margin:0">自动训练目标歌手模型 <span id="modelStatus" style="color:var(--muted);font-size:11px"></span></span>
+      </label>
+      <div class="row">
+        <div><label class="f"><span>训练轮数 <span class="val" id="epochVal">10</span></span><input type="range" id="trainEpochs" min="3" max="30" value="10" step="1"></label></div>
+        <div><label class="f"><span>训练批大小 <span class="val" id="bsVal">4</span></span><input type="range" id="trainBatch" min="1" max="8" value="4" step="1"></label></div>
+      </div>
+      <div class="hint" id="trainHint">开启后，若目标模型不存在，自动用参考歌曲训练（CPU 耗时数分钟～数小时）；同歌手二次 remix 自动复用已训练模型。</div>
     </div>
     <div class="row">
       <div><label class="f"><span>音高算法</span><select id="f0method"><option>rmvpe</option><option>crepe</option><option>pm</option><option>harvest</option></select></label></div>
@@ -244,6 +257,23 @@ function renderAll(){
 $('pitch').oninput=e=>$('pitchVal').textContent=e.target.value;
 $('indexRate').oninput=e=>$('irVal').textContent=e.target.value;
 $('vocalVol').oninput=e=>$('vvVal').textContent=e.target.value;
+$('trainEpochs').oninput=e=>$('epochVal').textContent=e.target.value;
+$('trainBatch').oninput=e=>$('bsVal').textContent=e.target.value;
+
+// ===== 模型状态查询（targetId 变化时检查是否已训练）=====
+async function checkModelExists(){
+  const tid=$('targetId').value.trim();
+  const el=$('modelStatus');
+  if(!tid){el.textContent='';return}
+  el.textContent='（查询中...）';
+  try{
+    const r=await fetch(`/api/models/${encodeURIComponent(tid)}/exists`).then(r=>r.json());
+    el.textContent=r.exists?'（已训练，将复用）':'（未训练，将自动训练）';
+    el.style.color=r.exists?'var(--ok)':'var(--warn)';
+  }catch(e){el.textContent='';}
+}
+$('targetId').addEventListener('change',checkModelExists);
+$('targetId').addEventListener('blur',checkModelExists);
 
 // ===== 模型列表 =====
 async function loadModels(){
@@ -252,6 +282,7 @@ async function loadModels(){
   catch(e){$('modelName').innerHTML='<option>base_v2_48k.pth</option>'}
 }
 loadModels();
+checkModelExists();
 
 // ===== 提交 =====
 $('submitBtn').onclick=async()=>{
@@ -272,6 +303,9 @@ $('submitBtn').onclick=async()=>{
   fd.append('accompaniment_volume','1.0');
   fd.append('output_sr','44100');
   fd.append('device','auto');
+  fd.append('auto_train',$('autoTrain').checked?'true':'false');
+  fd.append('train_epochs',$('trainEpochs').value);
+  fd.append('train_batch_size',$('trainBatch').value);
 
   $('submitBtn').disabled=true;
   $('progressWrap').style.display='block';

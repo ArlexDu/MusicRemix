@@ -58,6 +58,14 @@ async def list_models():
     return {"models": models, "weights_dir": str(weights_dir)}
 
 
+@app.get("/api/models/{target_id}/exists")
+async def check_model(target_id: str):
+    """查询目标歌手模型是否已训练（{target_id}.pth 是否存在）。"""
+    cfg = get_config()
+    p = Path(cfg.rvc_home) / "assets" / "weights" / f"{target_id}.pth"
+    return {"target_id": target_id, "exists": p.exists(), "path": str(p)}
+
+
 @app.get("/api/config")
 async def default_config():
     """返回默认参数，供前端预填。"""
@@ -124,12 +132,20 @@ async def create_remix(
     accompaniment_volume: float = Form(1.0),
     output_sr: int = Form(44100),
     device: str = Form("auto"),
+    # 自动训练参数
+    auto_train: bool = Form(True, description="自动训练目标歌手模型（已存在则复用）"),
+    train_epochs: int = Form(10, description="训练轮数（CPU 建议 5-20）"),
+    train_batch_size: int = Form(4, description="训练批大小（CPU 建议 2-4）"),
     source: Optional[UploadFile] = File(None, description="原唱歌曲（上传，与 source_file_id 二选一）"),
     references: list[UploadFile] = File(default=[], description="参考歌曲（上传）"),
     source_file_id: Optional[str] = Form(None, description="原唱歌曲 Audius track_id（在线选歌）"),
     reference_file_ids: str = Form("", description="参考歌曲 Audius track_id 列表，逗号分隔"),
 ):
-    """创建换音色任务。支持本地上传或 Audius 在线选歌（file_id）。"""
+    """创建换音色任务。支持本地上传或 Audius 在线选歌（file_id）。
+
+    开启 auto_train 时，若目标模型 {target_id}.pth 不存在，自动用参考歌曲训练；
+    训练失败则回退到 model_name 指定的现有模型。
+    """
     try:
         task = manager.create()
         wd = task.workdir
@@ -163,9 +179,18 @@ async def create_remix(
             vocal_volume=vocal_volume, accompaniment_volume=accompaniment_volume,
             output_sr=output_sr,
         )
+        train_kwargs = {
+            "auto_train": auto_train,
+            "total_epoch": train_epochs,
+            "batch_size": train_batch_size,
+            "sr": "48k",
+            "f0method": f0_method,
+            "save_epoch": max(1, train_epochs // 3),
+            "n_p": 4,
+        }
 
         manager.start(
-            task, src_path, ref_paths, params, model_name, mix_params, target_id, device,
+            task, src_path, ref_paths, params, model_name, mix_params, target_id, device, train_kwargs,
         )
         return {"task_id": task.id, "status": task.status}
     except HTTPException:

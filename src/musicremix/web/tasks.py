@@ -22,12 +22,14 @@ from ..utils.audio import save_audio
 
 # 阶段与进度区间
 STAGE_PROGRESS = {
-    "separating": (5, 30),
-    "modeling": (35, 60),
-    "converting": (65, 90),
+    "training": (2, 40),
+    "separating": (42, 55),
+    "modeling": (57, 65),
+    "converting": (67, 90),
     "mixing": (92, 99),
 }
 STAGE_LABEL = {
+    "training": "训练目标歌手模型",
     "separating": "分离人声与伴奏",
     "modeling": "构建目标音色索引",
     "converting": "音色迁移",
@@ -103,19 +105,25 @@ class TaskManager:
         mix_params: MixParams,
         target_id: str,
         device: str,
+        train_kwargs: dict | None = None,
     ) -> None:
         thread = threading.Thread(
             target=self._run,
-            args=(task, source_path, reference_paths, params, model_name, mix_params, target_id, device),
+            args=(task, source_path, reference_paths, params, model_name, mix_params, target_id, device, train_kwargs),
             daemon=True,
         )
         thread.start()
 
-    def _run(self, task, source_path, reference_paths, params, model_name, mix_params, target_id, device):
+    def _run(self, task, source_path, reference_paths, params, model_name, mix_params, target_id, device, train_kwargs=None):
         try:
             self._update(task, status="running", message="任务开始")
             wd = task.workdir
             sr = mix_params.output_sr
+            tk = train_kwargs or {}
+
+            # 阶段 0：训练目标歌手模型（可选，自动复用已训练模型）
+            if tk.get("auto_train", False):
+                model_name = self._maybe_train(task, reference_paths, target_id, device, wd, tk, model_name)
 
             # 阶段 1：分离
             self._set_stage(task, "separating")
@@ -167,6 +175,61 @@ class TaskManager:
                 message="任务失败", finished_at=time.time(),
             )
             traceback.print_exc()
+
+    def _maybe_train(self, task, reference_paths, target_id, device, wd, tk, model_name) -> str:
+        """自动训练目标歌手模型：已存在则复用，否则训练；训练失败回退原 model_name。
+
+        Returns:
+            实际用于转换的 model_name（.pth 文件名）
+        """
+        cfg = self.config
+        weights_dir = Path(cfg.rvc_home) / "assets" / "weights"
+        # 约定：target_id 对应的模型文件名 {target_id}.pth
+        target_pth = weights_dir / f"{target_id}.pth"
+        if target_pth.exists():
+            logger.info("目标模型已存在，跳过训练: %s", target_pth)
+            self._update(task, message=f"模型已存在，复用 {target_pth.name}")
+            return target_pth.name
+
+        # 需要训练
+        self._set_stage(task, "training")
+        lo, hi = STAGE_PROGRESS["training"]
+
+        def on_progress(stage_desc: str, sub: int):
+            p = lo + (hi - lo) * sub / 100
+            self._update(
+                task, progress=int(p),
+                message=f"训练中 · {stage_desc}（首次较慢，请耐心等待）",
+            )
+
+        try:
+            from ..training import run_training
+            pth = run_training(
+                list(reference_paths),
+                model_name=target_id,
+                workdir=wd,
+                sr=tk.get("sr", "48k"),
+                f0method=tk.get("f0method", "rmvpe"),
+                total_epoch=tk.get("total_epoch", 10),
+                batch_size=tk.get("batch_size", 4),
+                save_epoch=tk.get("save_epoch", 5),
+                device=device,
+                n_p=tk.get("n_p", 4),
+                config=cfg,
+                progress_cb=on_progress,
+            )
+            task.outputs["trained_model"] = str(pth)
+            self._set_stage(task, "training", done=True)
+            logger.info("目标模型训练完成: %s", pth)
+            return pth.name
+        except Exception as e:
+            logger.warning("自动训练失败，回退到 %s: %s", model_name, e)
+            self._update(
+                task,
+                message=f"训练失败({type(e).__name__}: {e})，回退到 {model_name}",
+            )
+            # 跳过 training 阶段剩余进度，直接进入下一阶段
+            return model_name
 
     def _set_stage(self, task: Task, stage: str, done: bool = False):
         lo, hi = STAGE_PROGRESS[stage]
