@@ -130,43 +130,49 @@ async def create_remix(
     reference_file_ids: str = Form("", description="参考歌曲 Audius track_id 列表，逗号分隔"),
 ):
     """创建换音色任务。支持本地上传或 Audius 在线选歌（file_id）。"""
-    task = manager.create()
-    wd = task.workdir
+    try:
+        task = manager.create()
+        wd = task.workdir
 
-    # 源歌曲：在线选歌优先，否则用上传文件
-    if source_file_id:
-        src_path = audius.download(source_file_id)
-    elif source is not None:
-        src_path = wd / f"source_{source.filename}"
-        with open(src_path, "wb") as f:
-            shutil.copyfileobj(source.file, f)
-    else:
-        raise HTTPException(status_code=400, detail="需要提供 source（上传）或 source_file_id（在线）")
+        # 源歌曲：在线选歌优先，否则用上传文件
+        if source_file_id:
+            src_path = audius.download(source_file_id)
+        elif source is not None:
+            src_path = wd / f"source_{source.filename}"
+            with open(src_path, "wb") as f:
+                shutil.copyfileobj(source.file, f)
+        else:
+            raise HTTPException(status_code=400, detail="需要提供 source（上传）或 source_file_id（在线）")
 
-    # 参考歌曲：上传 + 在线
-    ref_paths: list[Path] = []
-    for i, ref in enumerate(references):
-        rp = wd / f"ref_{i}_{ref.filename}"
-        with open(rp, "wb") as f:
-            shutil.copyfileobj(ref.file, f)
-        ref_paths.append(rp)
-    for tid in [s.strip() for s in reference_file_ids.split(",") if s.strip()]:
-        ref_paths.append(audius.download(tid))
-    if not ref_paths:
-        raise HTTPException(status_code=400, detail="至少需要 1 首参考歌曲")
+        # 参考歌曲：上传 + 在线
+        ref_paths: list[Path] = []
+        for i, ref in enumerate(references):
+            rp = wd / f"ref_{i}_{ref.filename}"
+            with open(rp, "wb") as f:
+                shutil.copyfileobj(ref.file, f)
+            ref_paths.append(rp)
+        for tid in [s.strip() for s in reference_file_ids.split(",") if s.strip()]:
+            ref_paths.append(audius.download(tid))
+        if not ref_paths:
+            raise HTTPException(status_code=400, detail="至少需要 1 首参考歌曲")
 
-    params = ConversionParams(
-        index_rate=index_rate, f0_method=f0_method, pitch=pitch,
-    )
-    mix_params = MixParams(
-        vocal_volume=vocal_volume, accompaniment_volume=accompaniment_volume,
-        output_sr=output_sr,
-    )
+        params = ConversionParams(
+            index_rate=index_rate, f0_method=f0_method, pitch=pitch,
+        )
+        mix_params = MixParams(
+            vocal_volume=vocal_volume, accompaniment_volume=accompaniment_volume,
+            output_sr=output_sr,
+        )
 
-    manager.start(
-        task, src_path, ref_paths, params, model_name, mix_params, target_id, device,
-    )
-    return {"task_id": task.id, "status": task.status}
+        manager.start(
+            task, src_path, ref_paths, params, model_name, mix_params, target_id, device,
+        )
+        return {"task_id": task.id, "status": task.status}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception("提交换音色任务失败")
+        raise HTTPException(status_code=500, detail=f"提交失败: {type(e).__name__}: {e}")
 
 
 @app.get("/api/tasks/{task_id}")

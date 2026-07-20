@@ -282,8 +282,14 @@ $('submitBtn').onclick=async()=>{
   $('msg').textContent='正在准备歌曲...';
   try{
     const r=await fetch('/api/remix',{method:'POST',body:fd});
-    if(!r.ok){const e=await r.json();throw new Error(e.detail||'提交失败')}
-    poll((await r.json()).task_id);
+    if(!r.ok){
+      // 后端可能返回 JSON 也可能返回 HTML（500），都尝试解析
+      let msg = `${r.status} ${r.statusText}`;
+      try{ const j=await r.json(); msg = j.detail || JSON.stringify(j); }catch(e){ msg += ' (响应非JSON)'; }
+      throw new Error(msg);
+    }
+    const data = await r.json().catch(()=>({}));
+    poll(data.task_id);
   }catch(e){showError(e.message)}
 };
 let pt=null;
