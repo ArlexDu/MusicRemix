@@ -215,7 +215,6 @@ class TaskManager:
                 save_epoch=tk.get("save_epoch", 5),
                 device=device,
                 n_p=tk.get("n_p", 4),
-                config=cfg,
                 progress_cb=on_progress,
             )
             task.outputs["trained_model"] = str(pth)

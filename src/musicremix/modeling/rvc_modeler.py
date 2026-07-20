@@ -17,6 +17,7 @@ import numpy as np
 from ..config import Config, get_config
 from ..separation.base import SourceSeparator, get_separator
 from ..utils.audio import get_duration, load_audio
+from ..utils.device import detect_device, torch_device_str
 from .base import VoiceModeler
 
 logger = logging.getLogger(__name__)
@@ -139,8 +140,6 @@ class RVCModeler(VoiceModeler):
             raise ImportError(
                 "音色建模需要 torch + transformers。请安装: pip install -e '.[rvc]' transformers"
             ) from e
-
-        from ..utils.device import detect_device, torch_device_str
 
         dev = detect_device(self.device)
         logger.info("加载 ContentVec 模型 %s (设备: %s)...", self.contentvec_model, dev.value)
