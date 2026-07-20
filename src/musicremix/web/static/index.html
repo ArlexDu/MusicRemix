@@ -290,7 +290,12 @@ $('submitBtn').onclick=async()=>{
     }
     const data = await r.json().catch(()=>({}));
     poll(data.task_id);
-  }catch(e){showError(e.message)}
+  }catch(e){
+    let msg=e.message;
+    if(msg.includes('403')) msg+='（该歌曲在 Audius 受限，可能为粉丝专属或已下架，请换一首或先试听确认）';
+    if(msg.includes('404')) msg+='（该歌曲不存在或已删除）';
+    showError(msg);
+  }
 };
 let pt=null;
 function poll(tid){
