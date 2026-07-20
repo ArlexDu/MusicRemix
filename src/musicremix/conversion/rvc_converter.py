@@ -129,8 +129,8 @@ class ExternalRVCConverter(VoiceConverter):
             "--protect", str(params.protect),
             "--device", _rvc_device_str(dev),
         ]
-        # 检索索引为可选增强
-        if Path(index_path).exists():
+        # 检索索引为可选增强（index_path 可能为 None，无索引模式）
+        if index_path and Path(index_path).exists():
             cmd += ["--index_path", str(index_path)]
 
         logger.info(

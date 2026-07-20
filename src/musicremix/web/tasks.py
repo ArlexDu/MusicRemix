@@ -126,11 +126,16 @@ class TaskManager:
             task.outputs["accompaniment"] = str(acc_path)
             self._set_stage(task, "separating", done=True)
 
-            # 阶段 2：建模
+            # 阶段 2：建模（容错：失败则无索引模式继续，base 模型推理不依赖索引）
             self._set_stage(task, "modeling")
             modeler = get_modeler("rvc", separator=sep, device=device)
-            index_path = modeler.build_index(list(reference_paths), target_id, wd)
-            task.outputs["index"] = str(index_path)
+            index_path = None
+            try:
+                index_path = modeler.build_index(list(reference_paths), target_id, wd)
+                task.outputs["index"] = str(index_path)
+            except Exception as e:
+                logger.warning("音色索引构建失败，以无索引模式继续: %s", e)
+                self._update(task, message=f"索引构建失败({e})，以无索引模式继续")
             self._set_stage(task, "modeling", done=True)
 
             # 阶段 3：转换

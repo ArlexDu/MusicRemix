@@ -35,7 +35,7 @@ class RVCModeler(VoiceModeler):
         separator: SourceSeparator | None = None,
         config: Config | None = None,
         device: str = "auto",
-        contentvec_model: str = "microsoft/contentvec",
+        contentvec_model: str = "facebook/hubert-base-ls960",  # ContentVec 需token，改用公开 HuBERT
     ):
         self.config = config or get_config()
         self.separator = separator or get_separator("demucs", device=device)
