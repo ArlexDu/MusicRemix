@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 import threading
 import time
 import traceback
@@ -9,6 +10,8 @@ import uuid
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Optional
+
+logger = logging.getLogger(__name__)
 
 from ..config import Config, get_config
 from ..conversion.base import ConversionParams, get_converter
