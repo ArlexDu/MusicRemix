@@ -57,6 +57,7 @@ venv\Scripts\python -m pip install -q --no-build-isolation "fairseq @ git+https:
 if errorlevel 1 echo [警告] fairseq 安装失败，Windows 上需安装 Visual Studio Build Tools
 venv\Scripts\python -m pip install -q faiss-cpu av praat-parselmouth "torchcrepe==0.0.23" torchfcpe "librosa==0.10.2" soundfile numba ffmpeg-python onnxruntime python-dotenv resampy "pyworld==0.3.2" %MIRROR%
 venv\Scripts\python -m pip install -q "setuptools<81" %MIRROR%
+venv\Scripts\python -m pip install -q tensorboard tensorboardX "matplotlib<3.8" %MIRROR%
 venv\Scripts\python -m pip install -q imageio-ffmpeg %MIRROR%
 REM ffmpeg: 用 copy（Windows 软链接需管理员权限）
 for /f "delims=" %%i in ('venv\Scripts\python -c "import imageio_ffmpeg; print(imageio_ffmpeg.get_ffmpeg_exe())"') do set FFMPEG_BIN=%%i
@@ -78,6 +79,7 @@ echo.
 echo === 5/5 构造 base 模型 ^& patch infer_cli ===
 venv\Scripts\python ..\..\scripts\make_base_model.py .
 venv\Scripts\python ..\..\scripts\patch_rvc_infer.py tools\infer_cli.py
+venv\Scripts\python ..\..\scripts\patch_rvc_infer.py infer\modules\train\extract_feature_print.py
 echo [OK] base 模型与 patch 完成
 
 cd ..\..

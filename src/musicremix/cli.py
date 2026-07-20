@@ -250,6 +250,49 @@ def info(
 
 
 @app.command()
+def train(
+    reference: list[str] = typer.Option(..., "--reference", "-r", help="目标歌手参考歌曲（可多次指定）"),
+    model_name: str = typer.Option(..., "--model-name", "-m", help="模型名（产出 .pth 名前缀）"),
+    workdir: str = typer.Option("./workdir", "--workdir", "-w", help="工作目录（训练数据存放）"),
+    sr: str = typer.Option("48k", "--sr", help="采样率 32k/40k/48k"),
+    f0method: str = typer.Option("rmvpe", "--f0-method", help="音高算法"),
+    total_epoch: int = typer.Option(10, "--epoch", help="训练总轮数（CPU 建议 5-20）"),
+    batch_size: int = typer.Option(4, "--batch-size", help="批大小（CPU 建议 2-4）"),
+    save_epoch: int = typer.Option(5, "--save-epoch", help="每隔几轮保存"),
+    device: str = typer.Option("auto", "--device", help="auto/cuda/mps/cpu"),
+    n_p: int = typer.Option(4, "--np", help="并发进程数"),
+    skip_separate: bool = typer.Option(False, "--skip-separate", help="参考已是干净人声，跳过分离"),
+    verbose: bool = typer.Option(False, "--verbose", "-v"),
+):
+    """训练目标歌手 RVC 模型（用参考歌曲微调生成器）。
+
+    训练产出的 .pth 放于 models/rvc/assets/weights/，可用于 convert/remix。
+    CPU 训练耗时较长（数小时），建议 GPU。
+    """
+    _setup_logging(verbose)
+    cfg = _apply_common_opts(workdir, 44100, device)
+    from .training import run_training, train_model, prepare_dataset
+
+    if skip_separate:
+        # 参考已是干净人声，直接训练
+        console.print(f"[cyan]跳过分离，直接训练（{len(reference)} 个文件）[/]")
+        pth = train_model(
+            reference[0] if len(reference) == 1 else reference,
+            model_name, sr=sr, f0method=f0method, total_epoch=total_epoch,
+            batch_size=batch_size, save_epoch=save_epoch, device=device, n_p=n_p, config=cfg,
+        )
+    else:
+        console.print(f"[cyan]开始训练：{len(reference)} 首参考 → 模型 {model_name}[/]")
+        pth = run_training(
+            reference, model_name, workdir=cfg.workdir_resolved,
+            sr=sr, f0method=f0method, total_epoch=total_epoch,
+            batch_size=batch_size, save_epoch=save_epoch, device=device, n_p=n_p, config=cfg,
+        )
+    console.print(f"[green bold]训练完成！[/] 模型: {pth}")
+    console.print(f"现在可用: musicremix convert --model-name {pth.name}")
+
+
+@app.command()
 def web(
     host: str = typer.Option("127.0.0.1", "--host", "-h", help="监听地址"),
     port: int = typer.Option(8000, "--port", "-p", help="监听端口"),

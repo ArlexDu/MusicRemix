@@ -67,6 +67,8 @@ venv/bin/pip install -q faiss-cpu av praat-parselmouth "torchcrepe==0.0.23" torc
     "pyworld==0.3.2" $MIRROR
 # setuptools<81：pyworld 依赖 pkg_resources（setuptools>=81 已移除）
 venv/bin/pip install -q "setuptools<81" $MIRROR
+# 训练所需：tensorboard + matplotlib<3.8（RVC 用了 tostring_rgb 旧 API）
+venv/bin/pip install -q tensorboard tensorboardX "matplotlib<3.8" $MIRROR
 # ffmpeg 二进制（RVC load_audio 依赖）
 venv/bin/pip install -q imageio-ffmpeg $MIRROR
 FFMPEG_BIN=$(venv/bin/python -c "import imageio_ffmpeg; print(imageio_ffmpeg.get_ffmpeg_exe())")
@@ -88,6 +90,8 @@ ok "预训练模型就绪"
 log "5/5  构造可推理 base 模型 & patch infer_cli"
 venv/bin/python ../../scripts/make_base_model.py .
 venv/bin/python ../../scripts/patch_rvc_infer.py tools/infer_cli.py
+# 训练用的 extract_feature_print.py 也需 patch（加载 hubert 需 weights_only=False）
+venv/bin/python ../../scripts/patch_rvc_infer.py infer/modules/train/extract_feature_print.py
 ok "base 模型与 patch 完成"
 
 cd ../..
